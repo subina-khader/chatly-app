@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/chat_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/home_screen.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+
 
 void main() {
   runApp(const ProviderScope(child: MyApp()));
@@ -15,6 +18,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'AI Chat Assistant',
+      localizationsDelegates: const [
+        FlutterQuillLocalizations.delegate,
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -31,7 +37,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
-      home: const ChatScreen(),
+      home: const HomeScreen(),
     );
   }
 }
