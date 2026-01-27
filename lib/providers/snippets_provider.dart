@@ -32,7 +32,19 @@ class SnippetsNotifier extends StateNotifier<List<Snippet>> {
     await _db.insertSnippet(snippet);
     await loadSnippets();
   }
-
+  Future<void> updateSnippet(String id, String content, SnippetType type) async {
+    final existingSnippet = state.firstWhere((s) => s.id == id);
+    final updatedSnippet = Snippet(
+      id: existingSnippet.id,
+      content: content,
+      type: type,
+      createdAt: existingSnippet.createdAt,
+      sourceMessageId: existingSnippet.sourceMessageId,
+      tags: existingSnippet.tags,
+    );
+    await _db.updateSnippet(updatedSnippet);
+    await loadSnippets();
+  }
   Future<void> deleteSnippet(String id) async {
     await _db.deleteSnippet(id);
     await loadSnippets();

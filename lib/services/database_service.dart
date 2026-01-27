@@ -192,7 +192,12 @@ class DatabaseService {
     snippetMap['tags'] = snippet.tags.join(',');
     await db.insert('snippets', snippetMap);
   }
-
+  Future<void> updateSnippet(Snippet snippet) async {
+    final db = await database;
+    final snippetMap = snippet.toJson();
+    snippetMap['tags'] = snippet.tags.join(',');
+    await db.update('snippets', snippetMap, where: 'id = ?', whereArgs: [snippet.id]);
+  }
   Future<void> deleteSnippet(String id) async {
     final db = await database;
     await db.delete('snippets', where: 'id = ?', whereArgs: [id]);

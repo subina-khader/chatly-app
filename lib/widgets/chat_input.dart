@@ -4,16 +4,20 @@ class ChatInput extends StatefulWidget {
   final Function(String) onSend;
   final VoidCallback onMicTap;
   final VoidCallback onImageTap;
+  final VoidCallback onSmartEditTap;
   final bool isListening;
   final bool isLoading;
+  final TextEditingController? controller;
 
   const ChatInput({
     super.key,
     required this.onSend,
     required this.onMicTap,
     required this.onImageTap,
+    required this.onSmartEditTap,
     this.isListening = false,
     this.isLoading = false,
+    this.controller,
   });
 
   @override
@@ -21,23 +25,32 @@ class ChatInput extends StatefulWidget {
 }
 
 class _ChatInputState extends State<ChatInput> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller;
   bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() {
-      setState(() {
-        _hasText = _controller.text.trim().isNotEmpty;
-      });
-    });
+    _controller = widget.controller ?? TextEditingController();
+    _controller.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller.removeListener(_onTextChanged);
+    if (widget.controller == null) {
+      _controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    final hasText = _controller.text.trim().isNotEmpty;
+    if (_hasText != hasText) {
+      setState(() {
+        _hasText = hasText;
+      });
+    }
   }
 
   void _handleSend() {
@@ -70,6 +83,17 @@ class _ChatInputState extends State<ChatInput> {
               icon: const Icon(Icons.image),
               onPressed: widget.isLoading ? null : widget.onImageTap,
               color: Theme.of(context).colorScheme.primary,
+              tooltip: 'Add Image',
+            ),
+
+            // Smart Edit button
+            IconButton(
+              icon: const Icon(Icons.auto_fix_high),
+              onPressed: widget.isLoading ? null : widget.onSmartEditTap,
+              color: _hasText
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              tooltip: 'Smart Edit',
             ),
 
             // Text input
@@ -113,6 +137,7 @@ class _ChatInputState extends State<ChatInput> {
                     : const Icon(Icons.send),
                 onPressed: widget.isLoading ? null : _handleSend,
                 color: Theme.of(context).colorScheme.primary,
+                tooltip: 'Send',
               )
             else
               IconButton(
@@ -123,6 +148,7 @@ class _ChatInputState extends State<ChatInput> {
                 color: widget.isListening
                     ? Colors.red
                     : Theme.of(context).colorScheme.primary,
+                tooltip: 'Voice Input',
               ),
           ],
         ),

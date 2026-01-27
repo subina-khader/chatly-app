@@ -85,6 +85,78 @@ class _SnippetsScreenState extends ConsumerState<SnippetsScreen> {
     );
   }
 
+  void _showEditSnippetDialog(Snippet snippet) {
+    final contentController = TextEditingController(text: snippet.content);
+    SnippetType selectedType = snippet.type;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Snippet'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<SnippetType>(
+                value: selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Type',
+                  border: OutlineInputBorder(),
+                ),
+                items: SnippetType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Row(
+                      children: [
+                        Icon(_getSnippetIcon(type)),
+                        const SizedBox(width: 8),
+                        Text(type.name.toUpperCase()),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => selectedType = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: contentController,
+                decoration: InputDecoration(
+                  hintText: _getHintText(selectedType),
+                  border: const OutlineInputBorder(),
+                ),
+                maxLines: 5,
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (contentController.text.trim().isNotEmpty) {
+                  ref.read(snippetsProvider.notifier).updateSnippet(
+                    snippet.id,
+                    contentController.text.trim(),
+                    selectedType,
+                  );
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   IconData _getSnippetIcon(SnippetType type) {
     switch (type) {
       case SnippetType.text:
@@ -207,6 +279,10 @@ class _SnippetsScreenState extends ConsumerState<SnippetsScreen> {
                     },
                   ),
                   IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () => _showEditSnippetDialog(snippet),
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.delete, size: 20, color: Colors.red),
                     onPressed: () {
                       ref.read(snippetsProvider.notifier).deleteSnippet(snippet.id);
@@ -238,6 +314,13 @@ class _SnippetsScreenState extends ConsumerState<SnippetsScreen> {
                         child: const Text('Copy'),
                       ),
                       TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showEditSnippetDialog(snippet);
+                        },
+                        child: const Text('Edit'),
+                      ),
+                      TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Close'),
                       ),
@@ -250,11 +333,12 @@ class _SnippetsScreenState extends ConsumerState<SnippetsScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'snippets_fab', // Add unique hero tag
+        heroTag: 'snippets_fab',
         onPressed: _showAddSnippetDialog,
         icon: const Icon(Icons.add),
         label: const Text('Add Snippet'),
-      ),    );
+      ),
+    );
   }
 
   String _formatDate(DateTime date) {

@@ -288,6 +288,7 @@ import '../widgets/chat_input.dart';
 import '../models/snippet.dart';
 import 'settings_screen.dart';
 import 'history_screen.dart';
+import '../services/ai_service.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -298,6 +299,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _chatInputController = TextEditingController();
+
   bool _isListening = false;
 
   @override
@@ -314,6 +317,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         curve: Curves.easeOut,
       );
     }
+  }
+  String _getSelectedText() {
+    // Simply return all text from the controller
+    return _chatInputController.text;
   }
 
   Future<void> _handleMicTap() async {
@@ -452,7 +459,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return Icons.code;
     }
   }
-
 // Feature 1: Add to Notes
   void _showAddToNotesDialog(String content, String messageId) async {
     // Load folders first
@@ -568,6 +574,139 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+  void _showSmartEditMenu() {
+    final selectedText = _getSelectedText();
+    if (selectedText.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter or select text first')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Smart Edit',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            _buildSmartEditOption(Icons.check_circle, 'Fix Grammar', 'grammar'),
+            _buildSmartEditOption(Icons.refresh, 'Rephrase', 'rephrase'),
+            _buildSmartEditOption(Icons.straighten, 'Simplify', 'simplify'),
+            _buildSmartEditOption(Icons.business, 'Make Professional', 'professional'),
+            _buildSmartEditOption(Icons.expand, 'Expand', 'expand'),
+            _buildSmartEditOption(Icons.compress, 'Shorten', 'shorten'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmartEditOption(IconData icon, String label, String action) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      onTap: () async {
+        Navigator.pop(context);
+        await _performSmartEdit(action);
+      },
+    );
+  }
+
+  Future<void> _performSmartEdit(String action) async {
+    final selectedText = _getSelectedText();
+    if (selectedText.trim().isEmpty) return;
+
+    final selection = _chatInputController.selection;
+    final hasSelection = selection.isValid && selection.start != selection.end;
+
+    final prompts = {
+      'grammar': 'Fix all grammar and spelling errors in the following text. Return ONLY the corrected text, no explanations:\n\n$selectedText',
+      'rephrase': 'Rephrase the following text to make it clearer while keeping the same meaning. Return ONLY the rephrased text, no explanations:\n\n$selectedText',
+      'simplify': 'Simplify the following text to make it easier to understand. Return ONLY the simplified text, no explanations:\n\n$selectedText',
+      'professional': 'Rewrite the following text to make it more professional and formal. Return ONLY the professional version, no explanations:\n\n$selectedText',
+      'expand': 'Expand the following text with more details and context. Return ONLY the expanded text, no explanations:\n\n$selectedText',
+      'shorten': 'Make the following text shorter and more concise. Return ONLY the shortened text, no explanations:\n\n$selectedText',
+    };
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Processing...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final ai = ref.read(aiServiceProvider);
+      final stream = ai.sendMessageStream(prompts[action]!);
+      String result = '';
+
+      await for (var chunk in stream) {
+        result += chunk;
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        // Clean up the result (remove any markdown formatting or quotes)
+        result = result.trim();
+        if (result.startsWith('"') && result.endsWith('"')) {
+          result = result.substring(1, result.length - 1);
+        }
+
+        if (hasSelection) {
+          // Replace only the selected text
+          final newText = _chatInputController.text.replaceRange(
+            selection.start,
+            selection.end,
+            result,
+          );
+          _chatInputController.text = newText;
+
+          // Set cursor at the end of replaced text
+          _chatInputController.selection = TextSelection.collapsed(
+            offset: selection.start + result.length,
+          );
+        } else {
+          // Replace all text
+          _chatInputController.text = result;
+
+          // Set cursor at the end
+          _chatInputController.selection = TextSelection.collapsed(
+            offset: result.length,
+          );
+        }
+
+        
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   void _createNewNoteWithContent(String folderId, String content, String messageId) {
     final controller = TextEditingController();
     showDialog(
@@ -747,14 +886,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
 
           ChatInput(
+            controller: _chatInputController,
+
             onSend: (text) {
               ref.read(chatProvider.notifier).sendMessage(text);
             },
             onMicTap: _handleMicTap,
             onImageTap: _handleImageTap,
+            onSmartEditTap: _showSmartEditMenu,
+
             isListening: _isListening,
             isLoading: chatState.isLoading,
           ),
+
         ],
       ),
     );
